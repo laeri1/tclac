@@ -79,9 +79,7 @@ void tclacClimate::loop()  {
 
 		byte check = getChecksum(dataRX, sizeof(dataRX));
 
-		//raw = getHex(dataRX, sizeof(dataRX));
-		
-		//ESP_LOGD("TCL", "RX full : %s ", raw.c_str());
+		print_hex_str(dataRX, sizeof(dataRX));
 		
 		// Проверяем контрольную сумму
 		if (check != dataRX[60]) {
@@ -107,9 +105,13 @@ void tclacClimate::update() {
 
 void tclacClimate::readData() {
 	
-	current_temperature = float((( (dataRX[17] << 8) | dataRX[18] ) / 374 - 32)/1.8);
+	current_temperature = float((( (dataRX[17] << 8) | dataRX[18] ) / 374.0 - 32.0)/1.8);
 	target_temperature = (dataRX[FAN_SPEED_POS] & SET_TEMP_MASK) + 16;
-
+	
+	this->temperature_out_sensor_->publish_state(dataRX[36] - 16.0);
+	this->temperature_he1_sensor_->publish_state((dataRX[30] - 65.0) / 2.0);
+	this->temperature_he2_sensor_->publish_state(dataRX[37] - 16.0);
+	
 	//ESP_LOGD("TCL", "TEMP: %f ", current_temperature);
 
 	if (dataRX[MODE_POS] & ( 1 << 4)) {
@@ -713,6 +715,19 @@ void tclacClimate::set_supported_presets(climate::ClimatePresetMask presets) {
   this->supported_presets_ = presets;
 }
 
+void tclacClimate::print_hex_str(uint8_t *buffer, int len) {
+    if (len <= 0) return;
+    
+//    char str[MAX_LINE_LENGTH * 3] = {0};
+    char str[80 * 3] = {0};
+    char *pstr = str;
+    
+    for (int i = 0; i < len && (pstr - str) < sizeof(str) - 3; i++) {
+        pstr += sprintf(pstr, "%02X ", buffer[i]);
+    }
+    
+    ESP_LOGD("TCL", "Received: %s", str);
+}
 
 }
 }

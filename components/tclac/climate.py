@@ -1,9 +1,11 @@
 ﻿from esphome import automation, pins
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import climate, uart
+from esphome.components import climate, uart, sensor
+
 from esphome.const import (
     CONF_ID,
+    CONF_NAME,
     CONF_LEVEL,
     CONF_BEEPER,
     CONF_VISUAL,
@@ -15,6 +17,10 @@ from esphome.const import (
     CONF_TARGET_TEMPERATURE,
     CONF_SUPPORTED_FAN_MODES,
     CONF_SUPPORTED_SWING_MODES,
+    UNIT_CELSIUS,
+    DEVICE_CLASS_TEMPERATURE,
+    STATE_CLASS_MEASUREMENT,
+    ICON_THERMOMETER
 )
 
 from esphome.components.climate import (
@@ -31,10 +37,13 @@ DEPENDENCIES = ["climate", "uart"]
 TCLAC_MIN_TEMPERATURE = 16.0
 TCLAC_MAX_TEMPERATURE = 31.0
 TCLAC_TARGET_TEMPERATURE_STEP = 1.0
-TCLAC_CURRENT_TEMPERATURE_STEP = 1.0
+TCLAC_CURRENT_TEMPERATURE_STEP = 0.1
 
 CONF_RX_LED = "rx_led"
 CONF_TX_LED = "tx_led"
+CONF_OUT_TEMP = "temperature_outside"
+CONF_HE1_TEMP = "temperature_he_inside"
+CONF_HE2_TEMP = "temperature_he_outside"
 CONF_DISPLAY = "show_display"
 CONF_FORCE_MODE = "force_mode"
 CONF_VERTICAL_AIRFLOW = "vertical_airflow"
@@ -150,6 +159,36 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_DISPLAY, default=True): cv.boolean,
             cv.Optional(CONF_RX_LED): pins.gpio_output_pin_schema,
             cv.Optional(CONF_TX_LED): pins.gpio_output_pin_schema,
+            cv.Optional(
+                CONF_OUT_TEMP,
+                default={ CONF_NAME: "Temperature outside",}
+            ): sensor.sensor_schema(
+                unit_of_measurement=UNIT_CELSIUS,
+                icon=ICON_THERMOMETER,
+                accuracy_decimals=1,
+                state_class=STATE_CLASS_MEASUREMENT,
+                device_class=DEVICE_CLASS_TEMPERATURE,
+            ),
+            cv.Optional(
+                CONF_HE1_TEMP,
+                default={ CONF_NAME: "Temperature heat exchanger inside",}
+            ): sensor.sensor_schema(
+                unit_of_measurement=UNIT_CELSIUS,
+                icon=ICON_THERMOMETER,
+                accuracy_decimals=1,
+                state_class=STATE_CLASS_MEASUREMENT,
+                device_class=DEVICE_CLASS_TEMPERATURE,
+            ),
+            cv.Optional(
+                CONF_HE2_TEMP,
+                default={ CONF_NAME: "Temperature heat exchanger outside",}
+            ): sensor.sensor_schema(
+                unit_of_measurement=UNIT_CELSIUS,
+                icon=ICON_THERMOMETER,
+                accuracy_decimals=1,
+                state_class=STATE_CLASS_MEASUREMENT,
+                device_class=DEVICE_CLASS_TEMPERATURE,
+            ),
             cv.Optional(CONF_FORCE_MODE, default=True): cv.boolean,
             cv.Optional(CONF_MODULE_DISPLAY, default=True): cv.boolean,
             cv.Optional(CONF_VERTICAL_AIRFLOW, default="CENTER"): cv.ensure_list(cv.enum(AIRFLOW_VERTICAL_DIRECTION_OPTIONS, upper=True)),
@@ -314,6 +353,13 @@ def to_code(config):
     yield cg.register_component(var, config)
     yield uart.register_uart_device(var, config)
     yield climate.register_climate(var, config)
+    
+    sens1 = yield sensor.new_sensor(config[CONF_OUT_TEMP])
+    cg.add(var.set_out_temperature_sensor(sens1))
+    sens2 = yield sensor.new_sensor(config[CONF_HE1_TEMP])
+    cg.add(var.set_he1_temperature_sensor(sens2))
+    sens3 = yield sensor.new_sensor(config[CONF_HE2_TEMP])
+    cg.add(var.set_he2_temperature_sensor(sens3))
 
     if CONF_BEEPER in config:
         cg.add(var.set_beeper_state(config[CONF_BEEPER]))
